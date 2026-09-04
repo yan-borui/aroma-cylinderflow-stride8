@@ -2,7 +2,6 @@ import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parents[1]))
-print(sys.executable)
 from functools import partial, wraps
 
 import einops
@@ -476,15 +475,17 @@ class PerceiverEncoder(nn.Module):
         self.depth = depth
         self.bottleneck_index = bottleneck_index  # where to put the botleneck, by default 0 means just after cross attention
         self.encode_geo = encode_geo
-        self.include_pos_in_value=include_pos_in_value
+        self.include_pos_in_value = include_pos_in_value
 
         if include_pos_in_value:
-            self.pos_encoding = FourierPositionalEmbedding(hidden_dim=hidden_dim,
-                                                          num_freq=num_freq,
-                                                          max_freq_log2=max_pos_encoding_freq,
-                                                          input_dim=input_dim,
-                                                          base_freq=2,
-                                                          use_relu=True)
+            self.pos_encoding = FourierPositionalEmbedding(
+                hidden_dim=hidden_dim,
+                num_freq=num_freq,
+                max_freq_log2=max_pos_encoding_freq,
+                input_dim=input_dim,
+                base_freq=2,
+                use_relu=True,
+            )
         else:
             self.pos_encoding = NeRFEncoding(
                 num_freq=num_freq,
@@ -617,7 +618,10 @@ class PerceiverEncoder(nn.Module):
         # cross attend the coordinates
         cross_attn, cross_ff = self.cross_attend_blocks
 
-        x = cross_attn(x, k=k, v=v+k if self.include_pos_in_value else v, mask=mask) + x
+        x = (
+            cross_attn(x, k=k, v=v + k if self.include_pos_in_value else v, mask=mask)
+            + x
+        )
         x = cross_ff(x) + x
 
         # layers
@@ -687,7 +691,10 @@ class PerceiverEncoder(nn.Module):
         cross_attn, cross_ff = self.cross_attend_blocks
 
         # cross attention only happens once for Perceiver IO
-        x = cross_attn(x, k=k, v=v+k if self.include_pos_in_value else v, mask=mask) + x
+        x = (
+            cross_attn(x, k=k, v=v + k if self.include_pos_in_value else v, mask=mask)
+            + x
+        )
         x = cross_ff(x) + x
 
         # layers
@@ -707,7 +714,6 @@ class PerceiverEncoder(nn.Module):
             mu = self.mean_fc(x)
             logvar = self.logvar_fc(x)
             return mu, logvar
-           
 
     def process(self, features, coords):
         queries = self.pos_query(coords)
@@ -807,7 +813,7 @@ class AROMAEncoderDecoderKL(nn.Module):
         dim=64,
         num_self_attentions=3,
         num_latents=16,
-        latent_dim=8,  
+        latent_dim=8,
         latent_heads=12,
         latent_dim_head=64,
         cross_heads=8,
@@ -819,7 +825,7 @@ class AROMAEncoderDecoderKL(nn.Module):
         max_pos_encoding_freq=4,
         num_freq=12,
         encode_geo=False,
-        include_pos_in_value=False
+        include_pos_in_value=False,
     ):
         super().__init__()
 
@@ -840,7 +846,7 @@ class AROMAEncoderDecoderKL(nn.Module):
             bottleneck_index=bottleneck_index,  # index of the bottleneck layer
             encode_geo=encode_geo,  # whether to encode implicitly the geometry
             num_freq=num_freq,  # number of frequencies for the positional embedding
-            include_pos_in_value=include_pos_in_value, # whether to mix the first pixel location and pixel value in the first CA.
+            include_pos_in_value=include_pos_in_value,  # whether to mix the first pixel location and pixel value in the first CA.
         )
 
         self.decoder = LocalityAwareINRDecoder(

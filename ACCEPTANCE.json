@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-04",
+  "method": "aroma",
+  "environment": {"platform": "Linux x86_64", "python": "3.11.15", "torch": "2.4.0+cpu", "h5py": "3.16.0", "matplotlib": "3.9.2"},
+  "independent_environment_install": "passed",
+  "common_contract_tests": {"passed": 5, "method_inapplicable_tests_skipped": 1},
+  "actual_models": {"ae_parameters": 624339, "dynamics_parameters": 1379208},
+  "smoke": {"ae_updates": 2, "dynamics_updates": 128, "exact_resume_matches_uninterrupted": true, "complete_native_fixture_epoch": true, "posterior_mean_cache_shape": [65,32,8], "forecast_frames": 64, "sample_seeds": [0,1,2], "fixed_validation_selection": true, "future_truth_independence": true},
+  "real_data_prepare": {"train_trajectories": 1000, "validation_trajectories": 100, "train_node_frames_in_normalizer": 122602350, "stored_frames_used": [0,64]},
+  "real_largest_train_mesh_cpu": {"trajectory": 364, "nodes": 2059, "ae_backward_update": "passed", "dynamics_full_mesh": "not run; complete dynamics verified on the variable-node synthetic fixture"},
+  "identical_prediction_metrics_across_three_repositories": true,
+  "two_concurrent_independent_run_directories": "passed using the shared MGN runner",
+  "media": {"png_visual_inspection": "passed", "gif_decode": "passed", "mp4_decode": "passed", "training_curves": "passed", "paired_three_method_shared_scales": "passed"},
+  "clean_linux_git_clone": "pending final source snapshot verification",
+  "target_gpu_maximum_graph_and_mixed_precision": "pending; explicit smoke --largest-graph command supplied",
+  "formal_long_training_started": false,
+  "test_accessed": false,
+  "quality_claim": "Software and data-contract acceptance only; no benchmark-quality claim"
+}

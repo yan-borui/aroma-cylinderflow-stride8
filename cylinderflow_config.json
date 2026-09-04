@@ -1,0 +1,11 @@
+{
+  "protocol": "cylinderflow.stride8.prefix65.v1",
+  "method": "aroma",
+  "noise_std": 0.02,
+  "log_every_updates": 1,
+  "checkpoint_every_updates": 1000,
+  "training": {
+    "ae": {"epochs": 10000, "learning_rate": 0.001, "min_lr": 0.00001, "microbatch": 1, "accumulation": 64, "validate_every_epochs": 500},
+    "dynamics": {"epochs": 5000, "learning_rate": 0.001, "min_lr": 0.000001, "microbatch": 128, "accumulation": 1, "validate_every_epochs": 250}
+  }
+}
