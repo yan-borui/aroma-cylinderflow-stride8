@@ -20,14 +20,13 @@ def main():
         "cylinderflow_stride8_75frames_manifest.json",
     ]
     for name in files:
-        url = f"https://huggingface.co/datasets/{DATA_REPOSITORY}/resolve/{DATA_REVISION}/{name}"
+        folder = "data" if name.endswith(".h5") else "metadata"
+        url = f"https://huggingface.co/datasets/{DATA_REPOSITORY}/resolve/{DATA_REVISION}/{folder}/{name}"
         temporary = args.output_dir / (name + ".partial")
         print(f"Downloading {name} from pinned revision {DATA_REVISION}", flush=True)
-        with (
-            urllib.request.urlopen(url, timeout=120) as response,
-            temporary.open("xb") as stream,
-        ):
-            shutil.copyfileobj(response, stream, length=1024 * 1024)
+        with urllib.request.urlopen(url, timeout=120) as response:
+            with temporary.open("xb") as stream:
+                shutil.copyfileobj(response, stream, length=1024 * 1024)
         os.replace(temporary, args.output_dir / name)
     dataset = Dataset(args.output_dir / files[0], args.output_dir / files[1])
     write_json(args.output_dir / "download_identity.json", dataset.identity())

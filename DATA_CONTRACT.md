@@ -5,6 +5,7 @@ This file, `cylinderflow/` and `tests_cylinderflow/` are identical in all three 
 
 Use [DingDong1921/mgn-cylinderflow-stride8-75frames](https://huggingface.co/datasets/DingDong1921/mgn-cylinderflow-stride8-75frames) at revision `8eae2c7a697e7d01f3b98f4d642ea476784df84a`.
 The two input files are `cylinderflow_stride8_75frames.h5` and `cylinderflow_stride8_75frames_manifest.json`.
+They are published in `data/` and `metadata/`, respectively; the fetch command stores both together in the requested local directory.
 The HDF5 contains `trajectory_0000` through `trajectory_1099`, each with `mesh_pos [N,2]`, triangular `cells [C,3]`, `node_type [N]`, and physical `uvp [75,N,3]` in **u, v, p** order. Mesh size varies by trajectory. Labels are normal=0, inlet=4, outlet=5, wall=6. Train is 0..999 and Validation is 1000..1099. Test is unsupported.
 
 Read stored frames **0..64 only**, equivalent to raw indices **0,8,...,512**, with physical interval **0.08 s**. There is no additional subsampling, temporal phase, or interpolation. Frame 0 is observed; frames 1..64 are predictions. Every saved prediction is `[65,N,3]` on the original mesh. The remaining 10 stored frames never enter targets, normalization, latent caches, checkpoint selection, or metrics.
