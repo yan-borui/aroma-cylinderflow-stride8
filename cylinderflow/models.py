@@ -151,7 +151,11 @@ def eagle_inputs(sample, stats, prepared: Path, device, initial_only: bool = Fal
         np.append(sample["node_type"], 2), dtype=torch.long, device=device
     )
     types = F.one_hot(labels, 9).float()[None, None].expand(1, length, -1, -1)
-    clusters = np.load(prepared / "clusters" / f"trajectory_{sample['index']:04d}.npy")
+    clusters = sample.get("clusters")
+    if clusters is None:
+        clusters = np.load(
+            prepared / "clusters" / f"trajectory_{sample['index']:04d}.npy"
+        )
     mask = clusters >= 0
     clusters = np.where(mask, clusters, n)
     clusters = torch.as_tensor(clusters, dtype=torch.long, device=device)[
@@ -287,9 +291,20 @@ def training_loss(
 
 @torch.no_grad()
 def rollout(
-    model, config, initial, stats, prepared, device, autoencoder=None, diagnostics=None
+    model,
+    config,
+    initial,
+    stats,
+    prepared,
+    device,
+    autoencoder=None,
+    diagnostics=None,
+    measure_stages: bool = True,
+    return_raw: bool = True,
 ):
     """Predict 64 future states; this function has no future-reference argument."""
+    if diagnostics is not None and not return_raw:
+        raise ValueError("diagnostics require the raw pre-boundary forecast")
     method = config["method"]
     model.eval()
     timings = {
@@ -298,29 +313,31 @@ def rollout(
         "decode_seconds": 0.0,
         "preprocess_seconds": 0.0,
     }
-    raw = []
+    raw = None
     if method == "eagle":
-        with measured(timings, "preprocess_seconds", device):
+        with measured(timings, "preprocess_seconds", device, enabled=measure_stages):
             args = eagle_inputs(initial, stats, prepared, device, initial_only=True)
-        with measured(timings, "model_seconds", device):
-            states, _, _, raw_states = model(
+        with measured(timings, "model_seconds", device, enabled=measure_stages):
+            result = model(
                 *args,
                 boundary_values=args[2][:, 0],
                 boundary_channels=(0, 1),
-                return_boundary_raw=True,
+                return_boundary_raw=return_raw,
+                forecast_only=not return_raw,
             )
-        with measured(timings, "decode_seconds", device):
+            states = result[0] if return_raw else result
+            raw_states = result[3] if return_raw else None
+        with measured(timings, "decode_seconds", device, enabled=measure_stages):
             n = len(initial["points"])
             states = states[0, :, :n] * tensor(stats["std"], device) + tensor(
                 stats["mean"], device
             )
-            raw_states = raw_states[0, :, :n] * tensor(stats["std"], device) + tensor(
-                stats["mean"], device
-            )
-            prediction, raw = (
-                states[..., :3].cpu().numpy(),
-                raw_states[..., :3].cpu().numpy(),
-            )
+            prediction = states[..., :3].cpu().numpy()
+            if return_raw:
+                raw_states = raw_states[0, :, :n] * tensor(
+                    stats["std"], device
+                ) + tensor(stats["mean"], device)
+                raw = raw_states[..., :3].cpu().numpy()
             if diagnostics is not None:
                 diagnostics["eagle_state_uvpq"] = states.cpu().numpy()
                 diagnostics["eagle_pre_boundary_uvpq"] = raw_states.cpu().numpy()
@@ -328,12 +345,12 @@ def rollout(
         current = tensor(initial["initial"][:, :2], device)
         boundary = torch.as_tensor(np.isin(initial["node_type"], [4, 6]), device=device)
         initial_uv = current.clone()
-        with measured(timings, "preprocess_seconds", device):
+        with measured(timings, "preprocess_seconds", device, enabled=measure_stages):
             graph, nodes, edges = mgn_inputs(initial, current, stats, device)
             onehot = nodes[:, 2:]
         states = [tensor(initial["initial"], device)]
-        raw = [states[0]]
-        with measured(timings, "model_seconds", device):
+        raw = [states[0]] if return_raw else None
+        with measured(timings, "model_seconds", device, enabled=measure_stages):
             for _ in range(64):
                 nodes = torch.cat(
                     [
@@ -352,24 +369,26 @@ def rollout(
                 pressure = output[:, 2:3] * tensor(
                     stats["pressure_std"], device
                 ) + tensor(stats["pressure_mean"], device)
-                raw.append(torch.cat([uv, pressure], dim=-1))
+                if return_raw:
+                    raw.append(torch.cat([uv, pressure], dim=-1))
                 current = torch.where(boundary[:, None], initial_uv, uv)
                 states.append(torch.cat([current, pressure], dim=-1))
-        with measured(timings, "decode_seconds", device):
+        with measured(timings, "decode_seconds", device, enabled=measure_stages):
             prediction = torch.stack(states).cpu().numpy()
-            raw = torch.stack(raw).cpu().numpy()
+            if return_raw:
+                raw = torch.stack(raw).cpu().numpy()
     else:
         if autoencoder is None:
             raise ValueError("AROMA rollout requires the locked AE")
         autoencoder.eval()
-        with measured(timings, "encode_seconds", device):
+        with measured(timings, "encode_seconds", device, enabled=measure_stages):
             values, coords = aroma_inputs(
                 initial["initial"], initial["points"], stats, device
             )
             current, _ = autoencoder.encode(values, coords)
         scheduler = aroma_scheduler()
         latents = []
-        with measured(timings, "model_seconds", device):
+        with measured(timings, "model_seconds", device, enabled=measure_stages):
             for _ in range(64):
                 candidate = torch.randn_like(current)
                 for timestep in scheduler.timesteps:
@@ -378,7 +397,7 @@ def rollout(
                     candidate = scheduler.step(output, timestep, candidate).prev_sample
                 current = candidate
                 latents.append(current)
-        with measured(timings, "decode_seconds", device):
+        with measured(timings, "decode_seconds", device, enabled=measure_stages):
             states = [tensor(initial["initial"], device)]
             for latent in latents:
                 state = autoencoder.decode(latent, coords)[0]
@@ -386,16 +405,21 @@ def rollout(
                     state * tensor(stats["std"][:3], device)
                     + tensor(stats["mean"][:3], device)
                 )
-            raw = torch.stack(states).cpu().numpy()
-            prediction = raw.copy()
+            prediction = torch.stack(states).cpu().numpy()
+            raw = prediction.copy() if return_raw else None
             mask = np.isin(initial["node_type"], [4, 6])
             prediction[1:, mask, :2] = initial["initial"][None, mask, :2]
     prediction[0] = initial["initial"]
-    raw[0] = initial["initial"]
+    if return_raw:
+        raw[0] = initial["initial"]
     if diagnostics is not None and "eagle_state_uvpq" in diagnostics:
         for name in ("eagle_state_uvpq", "eagle_pre_boundary_uvpq"):
             diagnostics[name][0, :, :3] = initial["initial"]
             diagnostics[name][0, :, 3] = 0.5 * np.sum(
                 initial["initial"][:, :2] ** 2, axis=-1
             )
-    return prediction.astype(np.float32), np.asarray(raw, dtype=np.float32), timings
+    return (
+        prediction.astype(np.float32, copy=False),
+        np.asarray(raw, dtype=np.float32) if return_raw else None,
+        timings,
+    )

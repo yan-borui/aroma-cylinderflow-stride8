@@ -1,0 +1,90 @@
+{
+  "schema": "cylinderflow.performance_implementation_verification.v1",
+  "observed_date": "2026-09-05",
+  "performance_protocol": "cylinderflow.initial_cpu_to_physical_cpu.fp32.v1",
+  "method": "aroma",
+  "source_base_commit": "1dd80f455e6be3955edd8426fdadd0a13fdda054",
+  "verification_run": "cylinderflow_speed_verify_20260905b",
+  "source_scope": "Base commit plus the performance implementation included in this release; commit-hook formatting checked by Python AST comparison.",
+  "cpu_only": true,
+  "checks": [
+    {
+      "check": "syntax",
+      "exit_code": 0
+    },
+    {
+      "check": "unit",
+      "exit_code": 0
+    },
+    {
+      "check": "native_benchmark",
+      "exit_code": 0
+    },
+    {
+      "check": "benchmark_cli",
+      "exit_code": 0
+    }
+  ],
+  "unit_tests": {
+    "command": "python -m unittest discover -s tests_cylinderflow -v",
+    "run": 11,
+    "passed": 10,
+    "skipped": 1,
+    "skip_reason": "EAGLE-only native boundary test in another method's repository"
+  },
+  "protocol_checks": [
+    "Two warmups excluded from three measured forecasts per trajectory",
+    "Model/input loading and output checks excluded from latency",
+    "Failed warmups and measured attempts retained with incomplete trajectories",
+    "GPU resident/peak/incremental byte accounting checked with mocked CUDA statistics",
+    "Mixed hardware, runtime, settings, registry and incomplete reports rejected",
+    "Measured seeds independent of warmup draws"
+  ],
+  "native_forecast_checks": {
+    "prediction_equal_with_and_without_stage_timers": true,
+    "prediction_equal_without_raw_diagnostics": true,
+    "no_raw_diagnostic_output": true,
+    "no_disk_io_inside_predictor": true,
+    "warmups": 2,
+    "measurements": 3
+  },
+  "model_scope": "Actual native model and selected synthetic fixture checkpoint, complete 64-frame forecast, both diagnostic and forecast-only outputs compared exactly; full benchmark adapter executed.",
+  "limitations": [
+    "Target GPU latency and memory not measured by this CPU verification",
+    "Synthetic debug reports cannot enter the formal cross-method comparison",
+    "Formal target measurements require matched hardware/runtime and the fixed Validation-24 registry"
+  ],
+  "formal_training_started": false,
+  "test_accessed": false,
+  "environment": {
+    "autocast": false,
+    "cpu_logical_count": 32,
+    "cpu_model": "AMD Ryzen 9 7950X 16-Core Processor",
+    "cuda_runtime": null,
+    "cudnn_benchmark": false,
+    "cudnn_deterministic": false,
+    "cudnn_version": null,
+    "deterministic_algorithms": false,
+    "device_count": 1,
+    "device_name": "AMD Ryzen 9 7950X 16-Core Processor",
+    "device_type": "cpu",
+    "float32_matmul_precision": "highest",
+    "gpu_compute_capability": null,
+    "gpu_total_memory_bytes": null,
+    "numpy_version": "1.26.4",
+    "platform_machine": "x86_64",
+    "platform_system": "Linux",
+    "precision": "fp32",
+    "python_version": "3.11.15",
+    "tf32_cudnn": false,
+    "tf32_matmul": false,
+    "thread_environment": {
+      "MKL_NUM_THREADS": "2",
+      "OMP_NUM_THREADS": "2",
+      "OPENBLAS_NUM_THREADS": "2"
+    },
+    "torch_interop_threads": 32,
+    "torch_threads": 2,
+    "torch_version": "2.4.0+cpu"
+  }
+}

@@ -14,7 +14,6 @@ from pathlib import Path
 import numpy as np
 import torch
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -130,7 +129,10 @@ def synchronize(device: torch.device) -> None:
 
 
 @contextlib.contextmanager
-def measured(timings: dict, name: str, device: torch.device):
+def measured(timings: dict, name: str, device: torch.device, enabled: bool = True):
+    if not enabled:
+        yield
+        return
     synchronize(device)
     begin = time.perf_counter()
     yield

@@ -1,5 +1,7 @@
 # CylinderFlow stride-8: AROMA adaptation
 
+Use [the matched performance benchmark](PERFORMANCE.md) for cross-method inference speed and GPU-memory cost after checkpoint selection.
+
 This independent private copy preserves upstream AROMA at `77ec74f27221f4ee1c2111a16800f4cfc1069414` and its MIT license. The new `python -m cylinderflow` workflow trains on Train frames 0..74 and forecasts 64 future frames from one initial frame on the original mesh. Start with [installation and commands](CYLINDERFLOW.md), [the common data/evaluation contract](DATA_CONTRACT.md), and [current alignment verification](ALIGNMENT_VERIFICATION.json) and [prior prefix65 acceptance](ACCEPTANCE.json).
 
 The native AE uses 32 latent tokens of dimension 8 (624,339 parameters); the conditional DiT has width 128, depth 4 (1,379,208 parameters). Defaults retain AE 10,000 epochs, AdamW 1e-3 with cosine minimum 1e-5, batch 64 via microbatch 1 × accumulation 64; dynamics 5,000 epochs, AdamW 1e-3 with cosine minimum 1e-6, trajectory batch 128. Both have weight decay 0. AE retains reconstruction plus KL weight 1e-5 and native point dropout. Dynamics caches posterior means, traverses all 74 adjacent transitions per trajectory batch, and retains four native DDPM/v-prediction timesteps. Each epoch exposes 1,000 sampled AE frames or 74,000 dynamics transitions, respectively; actual exposures/updates are logged.

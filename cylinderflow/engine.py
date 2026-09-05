@@ -363,6 +363,10 @@ def evaluate_model(
                 append_json(output_dir / "case_metrics.jsonl", row)
             rows.append(row)
     summary = summarize_trajectories(rows)
+    summary["timing_scope"] = (
+        "native instrumented evaluation diagnostics; use cylinderflow.benchmark "
+        "for matched end-to-end speed and memory comparisons"
+    )
     if output_dir is not None:
         write_csv(output_dir / "case_metrics.csv", rows)
         frame_rows = [

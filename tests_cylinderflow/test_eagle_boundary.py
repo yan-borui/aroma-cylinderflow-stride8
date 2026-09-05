@@ -42,7 +42,14 @@ class EagleBoundaryTests(unittest.TestCase):
                 changed = model(
                     *args, boundary_values=fixed_boundary, boundary_channels=(0, 1)
                 )[0]
+                forecast = model(
+                    *args,
+                    boundary_values=fixed_boundary,
+                    boundary_channels=(0, 1),
+                    forecast_only=True,
+                )
             torch.testing.assert_close(expected, changed, rtol=0, atol=0)
+            torch.testing.assert_close(expected, forecast, rtol=0, atol=0)
             self.assertEqual(expected.shape[-1], 4)
             self.assertFalse(
                 torch.equal(expected[:, 1:, :-1, 2:], args[2][:, 1:, :-1, 2:])
