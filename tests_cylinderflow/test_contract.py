@@ -29,18 +29,24 @@ class ContractTests(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
-    def test_prefix_only_statistics_samples_and_targets(self):
+    def test_training_uses_tail_but_evaluation_reads_only_first_65_frames(self):
         before = compute_statistics(self.dataset)
-        samples = {i: self.dataset.read(i)["field"] for i in (0, 1, 2)}
+        prefix = self.dataset.evaluation(0)["field"].copy()
         with h5py.File(self.dataset.dataset, "r+") as handle:
-            for group in handle.values():
-                group["uvp"][65:] = np.nan
-        self.assertEqual(before, compute_statistics(self.dataset))
-        for i, sample in samples.items():
-            np.testing.assert_array_equal(sample, self.dataset.read(i)["field"])
+            handle["trajectory_0000/uvp"][65:] += 10
+        after = compute_statistics(self.dataset)
+        self.assertNotEqual(before["mean"], after["mean"])
+        self.assertNotEqual(before["velocity_diff_mean"], after["velocity_diff_mean"])
+        self.assertEqual(after["frame_range"], [0, 74])
+        self.assertEqual(self.dataset.read(0)["field"].shape[0], 75)
+        np.testing.assert_array_equal(prefix, self.dataset.evaluation(0)["field"])
+        with h5py.File(self.dataset.dataset, "r+") as handle:
+            handle["trajectory_0000/uvp"][65:] = np.nan
         with self.assertRaises(ValueError):
-            self.dataset.read(0, 0, 66)
-        self.assertNotEqual(samples[0].shape[1], samples[1].shape[1])
+            compute_statistics(self.dataset)
+        np.testing.assert_array_equal(prefix, self.dataset.evaluation(0)["field"])
+        with self.assertRaises(ValueError):
+            self.dataset.read(0, 0, 76)
 
     def test_split_and_time_contract(self):
         with self.assertRaises(ValueError):
@@ -63,9 +69,9 @@ class ContractTests(unittest.TestCase):
             groups = epoch_groups(self.dataset, method, stage, 123, 0, 2)
             self.assertEqual(
                 sorted(unit for group in groups for unit in group),
-                [(i, t) for i in (0, 1) for t in range(64)],
+                [(i, t) for i in (0, 1) for t in range(74)],
             )
-        for method, stage, maximum in [("aroma", "ae", 65), ("eagle", "main", 60)]:
+        for method, stage, maximum in [("aroma", "ae", 75), ("eagle", "main", 70)]:
             for epoch in range(20):
                 units = [
                     unit
@@ -81,7 +87,7 @@ class ContractTests(unittest.TestCase):
         self.assertEqual((selected[0], selected[-1]), (1000, 1099))
 
     def test_metric_gauge_area_derivatives_and_failure(self):
-        sample = self.dataset.read(2)
+        sample = self.dataset.evaluation(2)
         target = sample["field"].astype(np.float64)
         prediction = target.copy()
         prediction[1:, :, 2] += 7

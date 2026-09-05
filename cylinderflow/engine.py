@@ -14,7 +14,7 @@ import numpy as np
 import torch
 
 from . import EVALUATOR_VERSION, PROTOCOL_VERSION
-from .data import DT, Dataset, compute_statistics, load_statistics
+from .data import DT, TRAIN_FRAMES, Dataset, compute_statistics, load_statistics
 from .metrics import (
     compute_metrics,
     node_area_weights,
@@ -29,6 +29,7 @@ from .models import (
     tensor,
     training_loss,
 )
+from .predictions import boundary_metrics, save_prediction
 from .runtime import (
     append_json,
     autocast,
@@ -128,7 +129,7 @@ def prepare_latents(dataset, config, prepared, checkpoint_file, device):
             "data_identity": dataset.identity(),
             "statistics": stats,
             "representation": "posterior_mean",
-            "frames": 65,
+            "frames": TRAIN_FRAMES,
         }
         handle.attrs["identity"] = json.dumps(identity, sort_keys=True)
         for index in dataset.splits["train"]:
@@ -149,8 +150,14 @@ def epoch_groups(dataset, method, stage, seed, epoch, effective_batch):
     generator = np.random.default_rng(np.random.SeedSequence([seed, epoch]))
     indices = dataset.splits["train"]
     if method == "mgn":
-        order = generator.permutation(len(indices) * 64)
-        units = [(indices[int(number) // 64], int(number) % 64) for number in order]
+        order = generator.permutation(len(indices) * (TRAIN_FRAMES - 1))
+        units = [
+            (
+                indices[int(number) // (TRAIN_FRAMES - 1)],
+                int(number) % (TRAIN_FRAMES - 1),
+            )
+            for number in order
+        ]
         return [
             units[start : start + effective_batch]
             for start in range(0, len(units), effective_batch)
@@ -160,9 +167,9 @@ def epoch_groups(dataset, method, stage, seed, epoch, effective_batch):
         return [
             [(index, step) for index in order[start : start + effective_batch]]
             for start in range(0, len(order), effective_batch)
-            for step in range(64)
+            for step in range(TRAIN_FRAMES - 1)
         ]
-    maximum = 60 if method == "eagle" else 65
+    maximum = TRAIN_FRAMES - 6 + 1 if method == "eagle" else TRAIN_FRAMES
     units = [(index, int(generator.integers(maximum))) for index in order]
     return [
         units[start : start + effective_batch]
@@ -194,6 +201,7 @@ def evaluate_model(
     training_seed,
     output_dir=None,
     autoencoder=None,
+    provenance=None,
 ):
     rows = []
     model.eval()
@@ -204,7 +212,7 @@ def evaluate_model(
         if stage == "ae":
             target = dataset.read(index)
             errors = []
-            for frame in (0, 21, 43, 64):
+            for frame in (0, 25, 50, 74):
                 values, coords = aroma_inputs(
                     target["field"][frame], target["points"], stats, device
                 )
@@ -286,7 +294,7 @@ def evaluate_model(
                     )
                 raise
             begin = time.perf_counter()
-            target = dataset.read(index)["field"]
+            target = dataset.evaluation(index)["field"]
             input_io += time.perf_counter() - begin
             begin = time.perf_counter()
             metrics = compute_metrics(
@@ -304,19 +312,11 @@ def evaluate_model(
                 and np.isfinite(primary)
             )
             metrics["metrics_seconds"] = time.perf_counter() - begin
-            mask = np.isin(initial["node_type"], [4, 6])
-            if np.isfinite(pre_boundary).all() and mask.any():
-                metrics["boundary_uv_rmse_pre_writeback"] = float(
-                    np.sqrt(
-                        np.mean(
-                            (
-                                pre_boundary[1:, mask, :2]
-                                - initial["initial"][None, mask, :2]
-                            )
-                            ** 2
-                        )
-                    )
+            metrics.update(
+                boundary_metrics(
+                    prediction, pre_boundary, initial["initial"], initial["node_type"]
                 )
+            )
             row = {
                 "trajectory_index": index,
                 "seed": seed,
@@ -337,7 +337,7 @@ def evaluate_model(
                     / "predictions"
                     / f"trajectory_{index:04d}_seed_{seed}.npz"
                 )
-                np.savez_compressed(
+                save_prediction(
                     prediction_file,
                     prediction=prediction,
                     pre_boundary=pre_boundary,
@@ -345,10 +345,16 @@ def evaluate_model(
                     points=initial["points"],
                     cells=initial["cells"],
                     node_type=initial["node_type"],
-                    raw_frame_indices=np.arange(0, 513, 8),
-                    physical_time=np.arange(65) * DT,
                     trajectory_index=index,
                     seed=seed,
+                    provenance={
+                        **(provenance or {}),
+                        "training_seed": training_seed,
+                        "sampler_seed": derived,
+                        "normalization": stats,
+                        "configuration": config,
+                        "data_identity": dataset.identity(),
+                    },
                     **diagnostics,
                 )
                 row["prediction_file"] = str(prediction_file.relative_to(output_dir))
@@ -414,11 +420,13 @@ def train(
     scheduler = (
         torch.optim.lr_scheduler.LambdaLR(optimizer, lambda update: 0.9999991**update)
         if config["method"] == "mgn"
-        else torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, options["epochs"], eta_min=options["min_lr"]
+        else (
+            torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, options["epochs"], eta_min=options["min_lr"]
+            )
+            if config["method"] == "aroma"
+            else None
         )
-        if config["method"] == "aroma"
-        else None
     )
     scaler = torch.amp.GradScaler(
         "cuda", enabled=device.type == "cuda" and precision == "fp16"
@@ -438,10 +446,12 @@ def train(
         if (
             identity["ae_checkpoint_id"] != ae_id
             or identity["statistics"] != stats
-            or identity["frames"] != 65
+            or identity["frames"] != TRAIN_FRAMES
         ):
             latent_cache.close()
-            raise ValueError("latent cache does not match AE/normalizer/prefix")
+            raise ValueError(
+                "latent cache does not match AE/normalizer/training frames"
+            )
     settings = {
         "seed": seed,
         "precision": precision,
@@ -464,11 +474,13 @@ def train(
                 "ae_checkpoint_id": ae_id,
                 "device": str(device),
                 "supplied_dataset_bytes": dataset.dataset.stat().st_size,
-                "example_unit": "trajectory-window"
-                if config["method"] == "eagle"
-                else "trajectory-frame"
-                if stage == "ae"
-                else "adjacent-transition",
+                "example_unit": (
+                    "trajectory-window"
+                    if config["method"] == "eagle"
+                    else "trajectory-frame"
+                    if stage == "ae"
+                    else "adjacent-transition"
+                ),
             },
         )
     else:
@@ -737,6 +749,14 @@ def evaluate(
             checkpoint["settings"]["seed"],
             candidate_dir,
             ae,
+            provenance={
+                "checkpoint": str(Path(checkpoint_file).resolve()),
+                "checkpoint_id": checkpoint["checkpoint_id"],
+                "checkpoint_update": checkpoint["updates"],
+                "training_code": checkpoint.get("code"),
+                "evaluation_code": code_identity(),
+                "ae_checkpoint_id": checkpoint.get("ae_checkpoint_id"),
+            },
         )
         record = {
             "checkpoint_id": checkpoint["checkpoint_id"],
@@ -757,9 +777,11 @@ def evaluate(
         "data_identity": dataset.identity(),
         "selected": selected,
         "candidates": candidates,
-        "state": "validation_complete_awaiting_test"
-        if mode == "validation"
-        else "selection_complete",
+        "state": (
+            "validation_complete_awaiting_test"
+            if mode == "validation"
+            else "selection_complete"
+        ),
     }
     write_json(output_dir / "evaluation.json", result)
     return result

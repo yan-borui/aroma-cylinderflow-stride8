@@ -1,4 +1,4 @@
-"""Physical-mesh metrics shared verbatim by the three stride-8 adapters.
+"""Physical-mesh metrics shared verbatim by the four stride-8 baselines.
 
 Adapted from the project's CylinderFlow physical-mesh evaluator. Spatial
 derivatives are piecewise linear on triangles; spectra below are temporal.
@@ -353,8 +353,13 @@ def compute_metrics(
 def summarize_trajectories(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Average sampling seeds within trajectory before population statistics."""
     grouped: dict[int, list[dict]] = {}
+    identities = set()
     for row in rows:
-        grouped.setdefault(int(row["trajectory_index"]), []).append(row)
+        identity = (int(row["trajectory_index"]), int(row["seed"]))
+        if identity in identities:
+            raise ValueError("duplicate trajectory/sample in metric aggregation")
+        identities.add(identity)
+        grouped.setdefault(identity[0], []).append(row)
     trajectories = []
     for index, samples in sorted(grouped.items()):
         valid = all(row.get("finite", False) for row in samples)

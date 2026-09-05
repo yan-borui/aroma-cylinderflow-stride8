@@ -34,7 +34,7 @@ def smoke(config, output_dir: Path, device):
     for stage in stages:
         # One complete tiny-fixture epoch exercises all native temporal pairs
         # and the epoch scheduler/Validation boundary as well as mid-epoch resume.
-        update_cap = 128 if config["method"] == "mgn" or stage == "dynamics" else 2
+        update_cap = 148 if config["method"] == "mgn" or stage == "dynamics" else 2
         run = output_dir / stage
         train(
             dataset,
@@ -92,8 +92,8 @@ def smoke(config, output_dir: Path, device):
             ae_checkpoint = checkpoint_file
             prepare_latents(dataset, config, prepared, ae_checkpoint, device)
             with h5py.File(prepared / "train_latents.h5") as handle:
-                assert all(value.shape == (65, 32, 8) for value in handle.values())
-            checks["posterior_mean_cache_prefix65"] = True
+                assert all(value.shape == (75, 32, 8) for value in handle.values())
+            checks["posterior_mean_cache_train75"] = True
     final_file = output_dir / stages[-1] / "last.pt"
     selection = evaluate(
         dataset,

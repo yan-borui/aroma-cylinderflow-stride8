@@ -1,0 +1,84 @@
+{
+  "schema": "cylinderflow.staged_alignment_verification.v1",
+  "observed_at_utc": "2026-09-05T06:48:39Z",
+  "method": "aroma",
+  "status": "PASS",
+  "source": {
+    "base_commit": "9f08623f08f3100b9ff6505e31be66d19b10a46d",
+    "change_identity": "The commit containing this record; reviewed working-tree sources verified in isolated Linux snapshots."
+  },
+  "protocol": "cylinderflow.stride8.train75.eval65.v2",
+  "evaluator": "cylinderflow.physical_mesh.v1",
+  "prediction_schema": "cylinderflow.physical_prediction.v2",
+  "training_frames": {
+    "ae": 75,
+    "dynamics": 75
+  },
+  "evaluation": {
+    "observed_frames": 1,
+    "future_frames": 64,
+    "total_frames": 65,
+    "dt": 0.08,
+    "raw_final_frame": 512
+  },
+  "frozen_recipe_preserved": true,
+  "hyperparameter_search": false,
+  "environment": {
+    "platform": "Linux",
+    "device": "cpu",
+    "dependencies": "Existing repository environments; no dependency installation or upgrade."
+  },
+  "verification_snapshots": [
+    "cylinderflow_alignment_verify_20260905a",
+    "cylinderflow_alignment_verify_20260905b",
+    "cylinderflow_alignment_verify_20260905c"
+  ],
+  "checks": [
+    {
+      "command": "python -m compileall -q cylinderflow tests_cylinderflow",
+      "exit_code": 0
+    },
+    {
+      "command": "python -m unittest discover -s tests_cylinderflow -v",
+      "tests": 6,
+      "skipped": 1,
+      "skip_reason": "EAGLE-only native module check",
+      "exit_code": 0
+    },
+    {
+      "command": "python -m cylinderflow smoke --device cpu --output-dir <new-output-directory>",
+      "exit_code": 0,
+      "checks": {
+        "ae_exact_resume": true,
+        "dynamics_exact_resume": true,
+        "fixed_validation_selection": true,
+        "full_64_step_rollout": true,
+        "future_truth_independence": true,
+        "png_gif_mp4_curves": true,
+        "posterior_mean_cache_train75": true
+      }
+    },
+    {
+      "check": "Final runtime AST equals the source used in the successful native smoke",
+      "files": 14,
+      "passed": true
+    }
+  ],
+  "cross_repository_scoring": {
+    "inputs": "The same three AROMA synthetic rollout archives",
+    "clips": 3,
+    "trajectories": 1,
+    "physical_aggregates_exactly_equal": true,
+    "failure_counts_equal": true,
+    "excluded_fields": [
+      "metrics_seconds"
+    ],
+    "original_comparison_issue": "The first verification harness compared measured scoring duration as well as physical results. Inspection found only metrics_seconds differences. The final comparison excludes that timing field; earlier logs remain preserved."
+  },
+  "limits": {
+    "formal_training_started": false,
+    "test_accessed": false,
+    "target_gpu_acceptance": "pending",
+    "trained_model_quality": "requires new training and Validation under this staged protocol"
+  }
+}

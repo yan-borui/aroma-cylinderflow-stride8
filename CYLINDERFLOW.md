@@ -24,7 +24,7 @@ export MANIFEST="$PWD/data/stride8/cylinderflow_stride8_75frames_manifest.json"
 python -m cylinderflow prepare --dataset "$DATA" --manifest "$MANIFEST" --output-dir runs/prepared --seed 123
 ```
 
-`prepare` creates `normalization.json` from Train frames 0..64, data identity and static graph caches (MGN/EAGLE), plus author-constrained clusters for EAGLE. AROMA's Train-only latent cache is a separate `prepare --latents` step after AE selection. `--debug-data` explicitly relaxes the official trajectory-count requirement for development fixtures and records that status; it must not be used for a formal run. The normalizer is embedded in checkpoints and checked against the active data contract.
+`prepare` creates `normalization.json` from Train frames 0..74, data identity and static graph caches (MGN/EAGLE), plus author-constrained clusters for EAGLE. AROMA's Train-only latent cache is a separate `prepare --latents` step after AE selection. `--debug-data` explicitly relaxes the official trajectory-count requirement for development fixtures and records that status; it must not be used for a formal run. The normalizer is embedded in checkpoints and checked against the active data contract.
 
 ## Training, recovery and resource allocation
 
@@ -66,3 +66,8 @@ python -m cylinderflow smoke --largest-graph --dataset "$DATA" --manifest "$MANI
 MGN/EAGLE perform one backward/update and 64-step prediction on the largest Train mesh, with microbatch 1, recording finite status, timings and peak memory. AROMA runs the AE stage by default; additionally run with `--stage dynamics --ae-checkpoint runs/ae/best.pt` after caching latents to check its 64-step path. This preflight uses disposable random models and never replaces a formal checkpoint. It certifies only its recorded device, precision and batch; increase resource use deliberately after that evidence. Formal runs retain the full requested budgets unless explicitly configured otherwise.
 
 Keep data, training weights, full predictions and structured logs on the training host. PNG/GIF/MP4 and curves support image-only review; whether logs/metric CSV can leave that host remains an operational agreement with its owner. This workflow generates no narrative report. Preserve upstream history and license; after cloning the private copy, restore the upstream URL with the command in the README because Git remotes are local clone configuration.
+
+The 2026-09-05 protocol trains on all 75 frames and evaluates only the first 65.
+Use a new prepared/result directory: old prefix65 normalizers, latent caches, and
+checkpoints retain their prior identity and cannot resume into the new protocol.
+Current checks are recorded in `ALIGNMENT_VERIFICATION.json`.

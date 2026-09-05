@@ -6,6 +6,7 @@ import numpy as np
 
 from . import EVALUATOR_VERSION
 from .metrics import compute_metrics, summarize_trajectories
+from .predictions import boundary_metrics, validate_prediction
 from .runtime import append_json, write_csv, write_json
 
 
@@ -14,8 +15,7 @@ def score(inputs, output_dir):
     rows, identities = [], set()
     for file_name in inputs:
         with np.load(file_name, allow_pickle=False) as bundle:
-            if not np.array_equal(bundle["raw_frame_indices"], np.arange(0, 513, 8)):
-                raise ValueError("prediction raw time indices differ from the contract")
+            validate_prediction(bundle)
             index, seed = int(bundle["trajectory_index"]), int(bundle["seed"])
             if (index, seed) in identities:
                 raise ValueError("duplicate trajectory/sample in metric aggregation")
@@ -28,6 +28,14 @@ def score(inputs, output_dir):
                 bundle["cells"],
                 bundle["node_type"],
                 0.08,
+            )
+            metrics.update(
+                boundary_metrics(
+                    bundle["prediction"],
+                    bundle["pre_boundary"],
+                    bundle["target"][0],
+                    bundle["node_type"],
+                )
             )
             primary = metrics.get("uv_relative_rmse")
             metrics["finite"] = bool(
