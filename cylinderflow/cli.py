@@ -1,10 +1,11 @@
-"""Offline, single-device entry points for the matched CylinderFlow task."""
+"""Offline single-device and explicit DDP entry points for matched CylinderFlow."""
 
 from __future__ import annotations
 
 import argparse
 import importlib.metadata
 import json
+import os
 import platform
 import sys
 import time
@@ -133,7 +134,17 @@ def main(argv=None):
     args = parser().parse_args(argv)
     started = time.time()
     destination = args.output_dir
-    if destination is not None and destination.exists() and args.command != "resume":
+    distributed_train = int(os.environ.get("WORLD_SIZE", "1")) > 1 and args.command in {
+        "train",
+        "resume",
+    }
+    primary = int(os.environ.get("RANK", "0")) == 0
+    if (
+        destination is not None
+        and destination.exists()
+        and args.command != "resume"
+        and not distributed_train
+    ):
         print(
             f"output directory already exists: {destination}; choose a new directory",
             file=sys.stderr,
@@ -157,6 +168,8 @@ def main(argv=None):
         else:
             torch.set_num_threads(args.threads)
             device = torch.device(args.device)
+            if distributed_train and device.type == "cuda":
+                device = torch.device(f"cuda:{int(os.environ['LOCAL_RANK'])}")
             if device.type not in {"cpu", "cuda"}:
                 raise ValueError(
                     "supported devices are cpu or an explicitly assigned cuda device"
@@ -237,6 +250,8 @@ def main(argv=None):
                     )
                 else:
                     result = smoke(config, destination, device)
+        if not primary:
+            return 0
         if destination is not None:
             destination.mkdir(parents=True, exist_ok=True)
             if args.command == "doctor":
@@ -265,7 +280,16 @@ def main(argv=None):
                 "started_unix": started,
                 "elapsed_seconds": time.time() - started,
             }
-            append_json(destination / "command_failures.jsonl", payload)
-            write_json(destination / "exit.json", payload)
+            append_json(
+                destination
+                / (
+                    "command_failures.jsonl"
+                    if primary
+                    else f"rank_{os.environ.get('RANK')}_failures.jsonl"
+                ),
+                payload,
+            )
+            if primary:
+                write_json(destination / "exit.json", payload)
         traceback.print_exc()
         return 1

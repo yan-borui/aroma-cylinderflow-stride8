@@ -1,5 +1,8 @@
 # CylinderFlow stride-8: AROMA adaptation
 
+The optional [four-GPU DDP recipe](FOUR_GPU.md) preserves global batches 64/128
+and runs AE → selected AE → Train latent cache → dynamics in one allocation.
+
 Use [the matched performance benchmark](PERFORMANCE.md) for cross-method inference speed and GPU-memory cost after checkpoint selection.
 
 This independent private copy preserves upstream AROMA at `77ec74f27221f4ee1c2111a16800f4cfc1069414` and its MIT license. The new `python -m cylinderflow` workflow trains on Train frames 0..74 and forecasts 64 future frames from one initial frame on the original mesh. Start with [installation and commands](CYLINDERFLOW.md), [the common data/evaluation contract](DATA_CONTRACT.md), and [current alignment verification](ALIGNMENT_VERIFICATION.json) and [prior prefix65 acceptance](ACCEPTANCE.json).

@@ -121,7 +121,7 @@ def prepare_latents(dataset, config, prepared, checkpoint_file, device):
     destination = prepared / "train_latents.h5"
     if destination.exists():
         raise FileExistsError(destination)
-    temporary = destination.with_suffix(".partial.h5")
+    temporary = destination.with_name(f"train_latents.{uuid.uuid4().hex}.partial.h5")
     with h5py.File(temporary, "x") as handle:
         identity = {
             "protocol": PROTOCOL_VERSION,
@@ -202,6 +202,7 @@ def evaluate_model(
     output_dir=None,
     autoencoder=None,
     provenance=None,
+    fail_on_runtime_error=False,
 ):
     rows = []
     model.eval()
@@ -271,6 +272,8 @@ def evaluate_model(
                     diagnostics,
                 )
             except (FloatingPointError, torch.cuda.OutOfMemoryError) as error:
+                if fail_on_runtime_error and isinstance(error, RuntimeError):
+                    raise
                 failure_reason = f"{type(error).__name__}: {error}"
                 prediction = np.full(
                     (65, len(initial["points"]), 3), np.nan, dtype=np.float32
@@ -406,6 +409,24 @@ def train(
     ae_checkpoint=None,
     max_updates=None,
 ):
+    if config.get("distributed", {}).get("world_size", 1) > 1:
+        from .ddp_engine import train_distributed
+
+        return train_distributed(
+            dataset,
+            config,
+            prepared,
+            output_dir,
+            device,
+            seed,
+            precision,
+            microbatch,
+            accumulation,
+            stage,
+            resume,
+            ae_checkpoint,
+            max_updates,
+        )
     stats = open_prepared(dataset, config, prepared)
     options = config["training"][stage]
     if min(microbatch, accumulation) < 1:
