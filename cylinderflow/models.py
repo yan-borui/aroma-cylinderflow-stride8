@@ -148,7 +148,9 @@ def eagle_inputs(sample, stats, prepared: Path, device, initial_only: bool = Fal
         1, length, -1, -1
     )
     labels = torch.as_tensor(
-        np.append(sample["node_type"], 2), dtype=torch.long, device=device
+        np.append(np.where(sample["node_type"] == 2, 6, sample["node_type"]), 2),
+        dtype=torch.long,
+        device=device,
     )
     types = F.one_hot(labels, 9).float()[None, None].expand(1, length, -1, -1)
     clusters = sample.get("clusters")
@@ -173,7 +175,7 @@ def mgn_inputs(sample, velocity, stats, device):
         device
     )
     classes = np.asarray(
-        [{0: 0, 4: 1, 5: 2, 6: 3}[int(label)] for label in sample["node_type"]]
+        [{0: 0, 4: 1, 2: 3}[int(label)] for label in sample["node_type"]]
     )
     onehot = F.one_hot(torch.as_tensor(classes, device=device), 4).float()
     normalized = (velocity - tensor(stats["velocity_mean"], device)) / tensor(
@@ -258,7 +260,7 @@ def training_loss(
                 *args,
                 apply_noise=True,
                 boundary_values=args[2][:, 0],
-                boundary_channels=(0, 1),
+                boundary_channels=(),
             )
             errors = (output[:, :, :n] - target[:, :, :n]) ** 2
             uv = errors[..., :2].sum() / (group_nodes * 5 * 2)
@@ -321,7 +323,7 @@ def rollout(
             result = model(
                 *args,
                 boundary_values=args[2][:, 0],
-                boundary_channels=(0, 1),
+                boundary_channels=(),
                 return_boundary_raw=return_raw,
                 forecast_only=not return_raw,
             )
@@ -343,7 +345,9 @@ def rollout(
                 diagnostics["eagle_pre_boundary_uvpq"] = raw_states.cpu().numpy()
     elif method == "mgn":
         current = tensor(initial["initial"][:, :2], device)
-        boundary = torch.as_tensor(np.isin(initial["node_type"], [4, 6]), device=device)
+        boundary = torch.as_tensor(
+            np.zeros_like(initial["node_type"], dtype=bool), device=device
+        )
         initial_uv = current.clone()
         with measured(timings, "preprocess_seconds", device, enabled=measure_stages):
             graph, nodes, edges = mgn_inputs(initial, current, stats, device)
@@ -407,7 +411,7 @@ def rollout(
                 )
             prediction = torch.stack(states).cpu().numpy()
             raw = prediction.copy() if return_raw else None
-            mask = np.isin(initial["node_type"], [4, 6])
+            mask = np.zeros_like(initial["node_type"], dtype=bool)
             prediction[1:, mask, :2] = initial["initial"][None, mask, :2]
     prediction[0] = initial["initial"]
     if return_raw:

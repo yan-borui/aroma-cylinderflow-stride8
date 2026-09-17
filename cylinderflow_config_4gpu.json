@@ -1,5 +1,5 @@
 {
-  "protocol": "cylinderflow.stride8.train75.eval65.v2",
+  "protocol": "airfoil.uvp.stride8.train75.eval65.v1",
   "method": "aroma",
   "noise_std": 0.02,
   "log_every_updates": 1,
