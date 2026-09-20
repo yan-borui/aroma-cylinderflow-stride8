@@ -1,5 +1,7 @@
 # CylinderFlow stride-8: AROMA adaptation
 
+**同机推理测速与 Validation100：**[运行说明与 Pareto 绘图交接](PARETO.md)。
+
 The optional [four-GPU DDP recipe](FOUR_GPU.md) preserves global batches 64/128
 and runs AE → selected AE → Train latent cache → dynamics in one allocation.
 
