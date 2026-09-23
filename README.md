@@ -1,5 +1,7 @@
 # CylinderFlow stride-8: AROMA adaptation
 
+**NAS 运行：**[启动入口与共享目录设置](NAS.md)。
+
 The optional [four-GPU DDP recipe](FOUR_GPU.md) preserves global batches 64/128
 and runs AE → selected AE → Train latent cache → dynamics in one allocation.
 
