@@ -33,19 +33,8 @@ if [[ "$action" == resume ]]; then extra=(--resume); fi
 
 export PREPARED_DIR=${PREPARED_DIR:-$DATA_DIR/prepared_aroma_4gpu}
 mkdir -p "$(dirname -- "$PREPARED_DIR")"
-(
-    flock 9
-    if [[ ! -f "$PREPARED_DIR/ready.json" ]]; then
-        if [[ -e "$PREPARED_DIR" ]]; then
-            printf 'Incomplete method cache exists: %s; choose a new PREPARED_DIR.\n' "$PREPARED_DIR" >&2; exit 2
-        fi
-        attempt=$(mktemp -d "${PREPARED_DIR}.attempt.XXXXXX")
-        "$python_bin" -m cylinderflow prepare --dataset "$data" --manifest "$manifest" \
-            --config cylinderflow_config_4gpu.json --output-dir "$attempt/prepared" \
-            2>&1 | tee "$attempt/prepare.log"
-        mv -- "$attempt/prepared" "$PREPARED_DIR"
-    fi
-) 9>"${PREPARED_DIR}.lock"
+"$python_bin" "$code_root/airfoil_data/portable_lock.py" --wait --lock "${PREPARED_DIR}.lock" -- \
+    bash "$code_root/scripts/prepare_airfoil_cache.sh"
 if [[ "$action" == prepare ]]; then exit 0; fi
 exec "$python_bin" -m cylinderflow.run_four_gpu --dataset "$data" --manifest "$manifest" \
     --prepared "$PREPARED_DIR" --output-dir "$RESULT_ROOT" --config cylinderflow_config_4gpu.json "${extra[@]}"
