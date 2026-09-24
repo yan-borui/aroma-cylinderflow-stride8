@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import math
 import os
 import time
 import uuid
@@ -37,7 +36,6 @@ from .runtime import (
     load_checkpoint,
     monitor_indices,
     peak_memory,
-    read_jsonl,
     restore_rng,
     rng_state,
     sample_seed,
@@ -146,15 +144,26 @@ def prepare_latents(dataset, config, prepared, checkpoint_file, device):
     return identity
 
 
-def epoch_groups(dataset, method, stage, seed, epoch, effective_batch):
+def epoch_groups(
+    dataset,
+    method,
+    stage,
+    seed,
+    epoch,
+    effective_batch,
+    dynamics_train_frames=TRAIN_FRAMES,
+):
+    if dynamics_train_frames not in (65, TRAIN_FRAMES):
+        raise ValueError("dynamics training requires 65 or 75 frames")
+    transitions = dynamics_train_frames - 1
     generator = np.random.default_rng(np.random.SeedSequence([seed, epoch]))
     indices = dataset.splits["train"]
     if method == "mgn":
-        order = generator.permutation(len(indices) * (TRAIN_FRAMES - 1))
+        order = generator.permutation(len(indices) * transitions)
         units = [
             (
-                indices[int(number) // (TRAIN_FRAMES - 1)],
-                int(number) % (TRAIN_FRAMES - 1),
+                indices[int(number) // transitions],
+                int(number) % transitions,
             )
             for number in order
         ]
@@ -167,9 +176,9 @@ def epoch_groups(dataset, method, stage, seed, epoch, effective_batch):
         return [
             [(index, step) for index in order[start : start + effective_batch]]
             for start in range(0, len(order), effective_batch)
-            for step in range(TRAIN_FRAMES - 1)
+            for step in range(transitions)
         ]
-    maximum = TRAIN_FRAMES - 6 + 1 if method == "eagle" else TRAIN_FRAMES
+    maximum = dynamics_train_frames - 6 + 1 if method == "eagle" else TRAIN_FRAMES
     units = [(index, int(generator.integers(maximum))) for index in order]
     return [
         units[start : start + effective_batch]
@@ -581,7 +590,13 @@ def train(
             max_updates is None or updates < max_updates
         ):
             groups = epoch_groups(
-                dataset, config["method"], stage, seed, epoch, effective_batch
+                dataset,
+                config["method"],
+                stage,
+                seed,
+                epoch,
+                effective_batch,
+                config.get("dynamics_train_frames", TRAIN_FRAMES),
             )
             if cursor > len(groups):
                 raise ValueError("invalid resume cursor")

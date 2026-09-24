@@ -12,7 +12,6 @@ import uuid
 from pathlib import Path
 
 import h5py
-import numpy as np
 import torch
 from torch.nn.parallel import DistributedDataParallel
 
@@ -431,7 +430,13 @@ def train_distributed(
             max_updates is None or updates < max_updates
         ):
             groups = epoch_groups(
-                dataset, config["method"], stage, seed, epoch, effective_batch
+                dataset,
+                config["method"],
+                stage,
+                seed,
+                epoch,
+                effective_batch,
+                config.get("dynamics_train_frames", TRAIN_FRAMES),
             )
             if cursor > len(groups):
                 raise ValueError("invalid global epoch-group cursor")
