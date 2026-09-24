@@ -82,6 +82,11 @@ bash scripts/airfoil_4gpu.sh resume
 prepare计算该方法的Train统计和静态图缓存；train使用原生四卡训练器。
 结果目录保存checkpoint、原生选优、物理评价和各阶段日志。
 
+## 多次采样
+
+已选权重的 Validation100 重复生成、物理均值与方差、各 K 成本通过
+[多次采样入口](SAMPLING.md)运行，默认每条轨迹生成 16 次。
+
 ## 本次验证范围
 
 本次完成源码、配置、Python/JSON/TOML语法、shell `bash -n`、Ruff F/E9和Git空白检查。
