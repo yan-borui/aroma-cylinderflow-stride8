@@ -19,7 +19,7 @@ config=${CONFIG:-$RESULT_ROOT/config.json}
 checkpoint=${CHECKPOINT:-$RESULT_ROOT/dynamics/best.pt}
 ae_checkpoint=${AE_CHECKPOINT:-$RESULT_ROOT/ae/best.pt}
 prepared=${PREPARED_DIR:-$RESULT_ROOT/prepared}
-exec bash "$code_root/scripts/nas.sh" python sampling_ensemble.py \
+exec bash "$code_root/scripts/nas.sh" python "${SAMPLING_ENTRYPOINT:-sampling_ensemble.py}" \
     --config "$config" --checkpoint "$checkpoint" --ae-checkpoint "$ae_checkpoint" \
     --dataset "$DATA_DIR/airfoil_stride8_75frames.h5" \
     --manifest "$DATA_DIR/airfoil_stride8_75frames_manifest.json" --prepared "$prepared" \
