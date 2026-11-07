@@ -43,7 +43,7 @@ python -m cylinderflow evaluate --dataset "$DATA" --manifest "$MANIFEST" --prepa
 python -m cylinderflow evaluate --dataset "$DATA" --manifest "$MANIFEST" --prepared runs/prepared --checkpoint runs/train/best.pt --mode validation --device cuda --output-dir runs/validation
 ```
 
-`--checkpoint` accepts several candidate files in selection mode. Read `evaluation.json` to identify the chosen checkpoint. The all-Validation command permits exactly one already-selected checkpoint and never exposes Test. It produces 100 MGN/EAGLE clips or 300 AROMA clips. Each clip is a compressed physical-mesh NPZ with all 65 states, target, pre-boundary predictions, mesh and exact time indices. Metric JSON/CSV retain failures, seed-level values and trajectory-level aggregation. Numerical/OOM failures are counted; infrastructure/programming errors preserve the failing case record and return a nonzero exit code.
+`--checkpoint` accepts several candidate files in selection mode. Read `evaluation.json` to identify the chosen checkpoint. The all-Validation command permits exactly one already-selected checkpoint and uses the separate [Test entrypoint](TEST.md) for final Test evaluation. It produces 100 MGN/EAGLE clips or 300 AROMA clips. Each clip is a compressed physical-mesh NPZ with all 65 states, target, pre-boundary predictions, mesh and exact time indices. Metric JSON/CSV retain failures, seed-level values and trajectory-level aggregation. Numerical/OOM failures are counted; infrastructure/programming errors preserve the failing case record and return a nonzero exit code.
 
 The following commands use saved arrays/logs and never train a model:
 
