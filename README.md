@@ -1,3 +1,5 @@
+**Test 评测：**[官方下载、1+64 转换与完整 Test100 入口](TEST.md)。
+
 **前65帧动力学训练：**[64个时间间隔的训练、恢复和评价入口](PREFIX65.md)。
 
 # AROMA · Airfoil UVP
@@ -24,5 +26,5 @@ bash scripts/airfoil_4gpu.sh train
 已有数据/缓存自动复用，`resume`恢复训练。只处理全量数据时运行
 `bash scripts/airfoil_4gpu.sh data`，无需GPU。
 
-此分支已做静态检查，目标四卡运行验收尚未执行。Test保持封存。
+此分支已做静态检查，目标四卡运行验收尚未执行。Test 入口见 [TEST.md](TEST.md)。
 原上游源码、许可证和历史CylinderFlow记录保留。
