@@ -85,7 +85,7 @@ def benchmark_checkpoint(
             "revision": DATA_REVISION,
             "split": "validation",
             "phase_offset": 0,
-            "raw_frame_indices": list(range(0, 513, 8)),
+            "raw_frame_indices": list(range(1, 962, 15)),
         },
         provenance={
             "checkpoint": str(checkpoint_file.resolve()),

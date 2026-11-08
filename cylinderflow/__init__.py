@@ -1,4 +1,4 @@
 """Portable, matched CylinderFlow stride-8 experiment tools."""
 
-PROTOCOL_VERSION = "airfoil.uvp.stride8.train75.eval65.v1"
-EVALUATOR_VERSION = "airfoil.uvp.physical_mesh.v1"
+PROTOCOL_VERSION = "megaflow2d.ellipse.uvp.stride15.train65.eval65.v1"
+EVALUATOR_VERSION = "megaflow2d.ellipse.uvp.physical_mesh.v1"

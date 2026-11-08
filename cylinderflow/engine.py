@@ -154,7 +154,7 @@ def epoch_groups(
     dynamics_train_frames=TRAIN_FRAMES,
 ):
     if dynamics_train_frames not in (65, TRAIN_FRAMES):
-        raise ValueError("dynamics training requires 65 or 75 frames")
+        raise ValueError("dynamics training requires the retained 65 frames")
     transitions = dynamics_train_frames - 1
     generator = np.random.default_rng(np.random.SeedSequence([seed, epoch]))
     indices = dataset.splits["train"]
@@ -222,7 +222,7 @@ def evaluate_model(
         if stage == "ae":
             target = dataset.read(index)
             errors = []
-            for frame in (0, 25, 50, 74):
+            for frame in (0, 21, 42, 64):
                 values, coords = aroma_inputs(
                     target["field"][frame], target["points"], stats, device
                 )
@@ -386,7 +386,7 @@ def evaluate_model(
                 "trajectory_index": row["trajectory_index"],
                 "seed": row["seed"],
                 "stored_frame": frame,
-                "raw_frame": frame * 8,
+                "raw_frame": 1 + frame * 15,
                 "time": frame * DT,
                 "uv_relative_rmse": value,
             }

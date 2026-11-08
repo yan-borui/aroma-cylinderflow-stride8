@@ -49,7 +49,7 @@ def main() -> None:
     config = config_from_file(args.config)
     training = Dataset(args.dataset, args.manifest)
     stats = open_prepared(training, config, args.prepared)
-    data = TestData(args.test_data_dir, "airfoil" if DT == 0.0016 else "cylinderflow")
+    data = TestData(args.test_data_dir, "airfoil" if DT == 0.15 else "cylinderflow")
     data.bind_training_manifest(training.manifest)
     checkpoint = load_checkpoint(args.checkpoint)
     stage = checkpoint["stage"]

@@ -76,8 +76,10 @@ class NativeLoss(torch.nn.Module):
 
 
 def freeze_source(output: Path, resume: bool) -> None:
-    for directory in ("cylinderflow", "modulus", "Models", "aroma"):
-        for original in sorted((ROOT / directory).rglob("*.py")):
+    for directory in ("cylinderflow", "modulus", "Models", "aroma", "megaflow_data"):
+        for original in sorted((ROOT / directory).rglob("*.py")) + sorted(
+            (ROOT / directory).glob("splits.json")
+        ):
             destination = output / "source" / original.relative_to(ROOT)
             if resume:
                 if (
@@ -178,7 +180,7 @@ def train_distributed(
                 or cache_id["statistics"] != stats
                 or cache_id["frames"] != TRAIN_FRAMES
             ):
-                raise ValueError("latent cache/AE/Train75 dependency mismatch")
+                raise ValueError("latent cache/AE/Train65 dependency mismatch")
         wrapper = NativeLoss(
             model, config, stage, dataset, stats, prepared, device, cache
         )
@@ -504,6 +506,10 @@ def train_distributed(
                         "gradient_norm": float(norm),
                         "learning_rate": used_lr,
                         "effective_batch": effective_batch,
+                        "actual_global_batch": len(group),
+                        "actual_rank_samples": [
+                            len(group[rank :: ctx.world]) for rank in range(ctx.world)
+                        ],
                         "elapsed_seconds": elapsed_prior
                         + time.perf_counter()
                         - started,

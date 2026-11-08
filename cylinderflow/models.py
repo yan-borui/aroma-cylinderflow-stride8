@@ -82,8 +82,8 @@ def aroma_inputs(field, points, stats, device):
     values = (tensor(field, device) - tensor(stats["mean"][:3], device)) / tensor(
         stats["std"][:3], device
     )
-    # This is the upstream CylinderFlow coordinate transform, not a machine path.
-    coords = (tensor(points, device) / 1.6 - 0.5) * 2
+    # Fixed physical rectangle of the released Ellipse mesh; no field-dependent fit.
+    coords = (tensor(points, device) / tensor([20.0, 10.0], device) - 0.5) * 2
     return values.unsqueeze(0), coords.unsqueeze(0)
 
 
@@ -175,7 +175,7 @@ def mgn_inputs(sample, velocity, stats, device):
         device
     )
     classes = np.asarray(
-        [{0: 0, 4: 1, 2: 3}[int(label)] for label in sample["node_type"]]
+        [{0: 0, 4: 1, 5: 2, 2: 3, 6: 3}[int(label)] for label in sample["node_type"]]
     )
     onehot = F.one_hot(torch.as_tensor(classes, device=device), 4).float()
     normalized = (velocity - tensor(stats["velocity_mean"], device)) / tensor(
