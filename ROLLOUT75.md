@@ -1,3 +1,5 @@
+**完整 Test75 / Validation75 评分：**使用 [EVALUATE75.md](EVALUATE75.md) 的 `evaluate75` 入口。本页 `rollout75` 保留 Test65 前缀评分兼容入口。
+
 # AROMA 原生 75 帧预测
 
 从真实第 0 帧开始，连续预测未来 74 帧，输出总计 75 帧 UVP。CylinderFlow dt=0.08，原始帧索引 0,8,…,592，覆盖 5.92 秒。固定已有选中权重，保留当前 `cylinderflow-stride8` 分支的 Train75、归一化和模型依赖。

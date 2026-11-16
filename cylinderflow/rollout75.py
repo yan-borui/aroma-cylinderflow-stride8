@@ -24,11 +24,12 @@ from .runtime import (
     sample_seed,
     seed_everything,
     synchronize,
+    write_csv,
     write_json,
 )
 
 
-def main() -> None:
+def main(*, test_frames: int = 65) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--config", type=Path, default=ROOT / "cylinderflow_config.json"
@@ -46,6 +47,7 @@ def main() -> None:
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--threads", type=int, default=2)
     args = parser.parse_args()
+    args.test_frames = test_frames
     if min(args.case_count, args.threads) < 1:
         parser.error("case-count and threads must be positive")
     if (args.scope == "test") != (args.test_data_dir is not None):
@@ -77,6 +79,7 @@ def main() -> None:
 def run(args: argparse.Namespace, device: torch.device) -> None:
     """Load fixed weights once, generate each trajectory, then read references."""
     torch.set_num_threads(args.threads)
+    torch.cuda.set_device(device)
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = False
     config = config_from_file(args.config)
@@ -103,7 +106,11 @@ def run(args: argparse.Namespace, device: torch.device) -> None:
         autoencoder.eval().float().requires_grad_(False)
     data = training
     if args.scope == "test":
-        data = TestData(args.test_data_dir, "cylinderflow")
+        data = TestData(
+            args.test_data_dir,
+            "cylinderflow",
+            expected_frames=args.test_frames,
+        )
         data.bind_training_manifest(training.manifest)
     population = list(data.splits[args.scope])
     indices = (
@@ -142,7 +149,10 @@ def run(args: argparse.Namespace, device: torch.device) -> None:
         "seed_rule": "native sample_seed(training_seed, trajectory_index, sampling_label)",
         "observed_frames": [0],
         "predicted_frames": [1, 74],
-        "reference_frames": [0, 74 if args.scope == "validation" else 64],
+        "reference_frames": [
+            0,
+            74 if args.scope == "validation" else args.test_frames - 1,
+        ],
         "frame_dt": DT,
         "duration_seconds": 74 * DT,
         "aggregation": "score independent samples; average scores within trajectory, then equally across trajectories",
@@ -243,7 +253,7 @@ def run(args: argparse.Namespace, device: torch.device) -> None:
                 row["prefix64"] = compute_metrics(
                     prediction[:65], target[:65], *geometry
                 )
-                if args.scope == "validation":
+                if len(target) == 75:
                     row["full74"] = compute_metrics(
                         prediction,
                         target,
@@ -276,7 +286,9 @@ def run(args: argparse.Namespace, device: torch.device) -> None:
             rows.append(row)
             summaries = {}
             for name in (
-                ("prefix64", "full74") if args.scope == "validation" else ("prefix64",)
+                ("prefix64", "full74")
+                if args.scope == "validation" or args.test_frames == 75
+                else ("prefix64",)
             ):
                 metric_rows = [
                     {
@@ -288,6 +300,10 @@ def run(args: argparse.Namespace, device: torch.device) -> None:
                     for item in rows
                 ]
                 summaries[name] = summarize_trajectories(metric_rows)
+                write_csv(
+                    args.output_dir / f"{name}_trajectory_metrics.csv",
+                    summaries[name]["trajectory_metrics"],
+                )
             write_json(
                 args.output_dir / "summary.json",
                 {
@@ -297,7 +313,7 @@ def run(args: argparse.Namespace, device: torch.device) -> None:
                     "completed_samples": len(rows),
                     "failed_samples": sum(not item["finite"] for item in rows),
                     "metric_future_frames": {"prefix64": 64, "full74": 74}
-                    if args.scope == "validation"
+                    if args.scope == "validation" or args.test_frames == 75
                     else {"prefix64": 64},
                     "aggregate": summaries,
                     "cases": rows,
