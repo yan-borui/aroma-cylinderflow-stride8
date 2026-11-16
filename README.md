@@ -1,3 +1,5 @@
+**75 帧原生递推：**[初始帧 + 74 帧预测及运行说明](ROLLOUT75.md)。
+
 **Test 评测：**[官方下载、1+64 转换与完整 Test100 入口](TEST.md)。
 
 # CylinderFlow stride-8: AROMA adaptation

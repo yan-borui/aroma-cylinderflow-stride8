@@ -125,11 +125,18 @@ def prepare_clusters(dataset, directory: Path, seed: int) -> None:
     )
 
 
-def eagle_inputs(sample, stats, prepared: Path, device, initial_only: bool = False):
+def eagle_inputs(
+    sample,
+    stats,
+    prepared: Path,
+    device,
+    initial_only: bool = False,
+    future_frames: int = 64,
+):
     points = sample["points"]
     n = len(points)
     uvp = (
-        np.repeat(sample["initial"][None], 65, axis=0)
+        np.repeat(sample["initial"][None], future_frames + 1, axis=0)
         if initial_only
         else sample["field"]
     )
@@ -301,8 +308,12 @@ def rollout(
     diagnostics=None,
     measure_stages: bool = True,
     return_raw: bool = True,
+    *,
+    future_frames: int = 64,
 ):
-    """Predict 64 future states; this function has no future-reference argument."""
+    """Predict 64 or 74 future states without reading future reference fields."""
+    if future_frames not in (64, 74):
+        raise ValueError("supported forecast lengths are 64 and 74 future frames")
     if diagnostics is not None and not return_raw:
         raise ValueError("diagnostics require the raw pre-boundary forecast")
     method = config["method"]
@@ -316,7 +327,14 @@ def rollout(
     raw = None
     if method == "eagle":
         with measured(timings, "preprocess_seconds", device, enabled=measure_stages):
-            args = eagle_inputs(initial, stats, prepared, device, initial_only=True)
+            args = eagle_inputs(
+                initial,
+                stats,
+                prepared,
+                device,
+                initial_only=True,
+                future_frames=future_frames,
+            )
         with measured(timings, "model_seconds", device, enabled=measure_stages):
             result = model(
                 *args,
@@ -351,7 +369,7 @@ def rollout(
         states = [tensor(initial["initial"], device)]
         raw = [states[0]] if return_raw else None
         with measured(timings, "model_seconds", device, enabled=measure_stages):
-            for _ in range(64):
+            for _ in range(future_frames):
                 nodes = torch.cat(
                     [
                         (current - tensor(stats["velocity_mean"], device))
@@ -389,7 +407,7 @@ def rollout(
         scheduler = aroma_scheduler()
         latents = []
         with measured(timings, "model_seconds", device, enabled=measure_stages):
-            for _ in range(64):
+            for _ in range(future_frames):
                 candidate = torch.randn_like(current)
                 for timestep in scheduler.timesteps:
                     k = torch.full((1,), float(timestep) * (1000 / 3), device=device)
